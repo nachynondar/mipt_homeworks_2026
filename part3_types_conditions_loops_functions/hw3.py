@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 import sys
 
-# Message constants
 UNKNOWN_COMMAND_MSG = "Unknown command!"
 NONPOSITIVE_VALUE_MSG = "Value must be grater than zero!"
 INCORRECT_DATE_MSG = "Invalid date!"
 OP_SUCCESS_MSG = "Added"
 
-# System constants
 DATE_PARTS_COUNT = 3
 INCOME_CMD_LEN = 3
 COST_CMD_LEN = 4
@@ -87,13 +85,21 @@ def parse_amount(raw: str):
 
 
 def is_not_later(d1, d2) -> bool:
-    """Compares two dates."""
-    return (d1[2], d1[1], d1[0]) <= (d2[2], d2[1], d2[0])
+    """Compares two dates without complex tuple creation in one line."""
+    year_ord = d1[2] <= d2[2]
+    if d1[2] != d2[2]:
+        return year_ord
+    month_ord = d1[1] <= d2[1]
+    if d1[1] != d2[1]:
+        return month_ord
+    return d1[0] <= d2[0]
 
 
 def is_same_month(d1, d2) -> bool:
-    """Checks if month and year match."""
-    return d1[1] == d2[1] and d1[2] == d2[2]
+    """Checks if month and year match with low Jones complexity."""
+    same_y = d1[2] == d2[2]
+    same_m = d1[1] == d2[1]
+    return same_y and same_m
 
 
 def handle_income(incomes, amt_str, dt_str):
@@ -126,13 +132,14 @@ def handle_cost(costs, cat, amt_str, dt_str):
 
 
 def get_month_stats(incomes, costs, s_dt):
-    """Calculates monthly totals."""
+    """Calculates monthly totals with limited variables."""
     m_inc = 0
     for a, ds in incomes:
         d = extract_date(ds)
         if d and is_same_month(d, s_dt) and is_not_later(d, s_dt):
             m_inc += a
-    m_cost, cats = 0, {}
+    m_cost = 0
+    cats = {}
     for c, a, d in costs:
         if is_same_month(d, s_dt) and is_not_later(d, s_dt):
             m_cost += a
@@ -149,19 +156,18 @@ def format_val(amt):
 
 def build_lines(date_str, t_cap, monthly_data):
     """Creates output lines to reduce complexity."""
-    m_inc, m_cost, m_res, res_msg = monthly_data
     return [
         f"Ваша статистика по состоянию на {date_str}:",
         f"Суммарный капитал: {t_cap:.2f} рублей",
-        f"В этом месяце {res_msg} {m_res:.2f} рублей",  # noqa: RUF001
-        f"Доходы: {m_inc:.2f} рублей",
-        f"Расходы: {m_cost:.2f} рублей",
+        f"В этом месяце {monthly_data[3]} {monthly_data[2]:.2f} рублей",  # noqa: RUF001
+        f"Доходы: {monthly_data[0]:.2f} рублей",
+        f"Расходы: {monthly_data[1]:.2f} рублей",
         "", "Детализация (категория: сумма):"
     ]
 
 
 def get_totals(incomes, costs, s_dt):
-    """Calculates total income and costs separately to reduce complexity."""
+    """Calculates total income and costs."""
     t_inc = 0
     for a, ds in incomes:
         d = extract_date(ds)
@@ -175,7 +181,7 @@ def get_totals(incomes, costs, s_dt):
 
 
 def show_stats(incomes, costs, date_str):
-    """Shows statistics."""
+    """Shows statistics with minimal local variables."""
     s_dt = extract_date(date_str)
     if not s_dt:
         return INCORRECT_DATE_MSG
