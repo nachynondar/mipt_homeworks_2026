@@ -51,7 +51,7 @@ def is_leap_year(year: int) -> bool:
         return True
     if year % 100 == 0:
         return False
-    return year % 400 == 0
+    return year % 4 == 0
 
 
 def days_in_month(month: int, year: int) -> int:
@@ -82,17 +82,17 @@ def extract_date(maybe_date: str) -> tuple[int, int, int] | None:
     if not is_valid_day_and_month(day, month, year):
         return None
 
-    if day <= days_in_month(month, year):
-        return day, month, year
-    return None
+    return day, month, year
 
 
 def income_handler(amount: float, date_str: str) -> str:
-
-    if amount <= 0:
-        financial_transactions_storage.append({})
-        return NONPOSITIVE_VALUE_MSG
     date_value = extract_date(date_str)
+    if date_value is None or amount <= 0:
+        financial_transactions_storage.append({})
+        if date_value is None:
+            return INCORRECT_DATE_MSG
+        return NONPOSITIVE_VALUE_MSG
+
     financial_transactions_storage.append({
         KEY_TYPE: INCOME_COMMAND,
         KEY_AMOUNT: amount,
@@ -103,7 +103,7 @@ def income_handler(amount: float, date_str: str) -> str:
 
 def is_category_valid(category_name: str) -> bool:
     parts = category_name.split("::")
-    if len(parts) != CAT_PARTS_COUNT:
+    if len(parts) != CATEGORY_NAME_PARTS_COUNT:
         return False
     common, target = parts
     return target in EXPENSE_CATEGORIES.get(common, ())
@@ -121,10 +121,10 @@ def cost_handler(category_name: str, amount: float, date_str: str) -> str:
         return NOT_EXISTS_CATEGORY
 
     financial_transactions_storage.append({
-        KEY_TYPE: COST,
+        KEY_TYPE: COST_COMMAND,
         KEY_CATEGORY: category_name,
         KEY_AMOUNT: amount,
-        KEY_DATE: parsed_date,
+        KEY_DATE: date_value,
     })
     return OP_SUCCESS_MSG
 
@@ -146,7 +146,7 @@ def date_lower(date_one: DateTuple, date_other: DateTuple) -> bool:
 
 def same_month(date_one: DateTuple, date_other: DateTuple) -> bool:
     equal_months = date_one[1] == date_other[1]
-    eaqual_year = date_one[2] == date_other[2]
+    equal_year = date_one[2] == date_other[2]
     return equal_months and equal_year
 
 
@@ -157,10 +157,9 @@ def update_totals_for_income(
     month_income: float,
 ) -> tuple[float, float]:
     item_date = item[KEY_DATE]
-    if not one_month(item_date, report):
-        return total_capital + item[KEY_AMOUNT], month_income
     total_capital += item[KEY_AMOUNT]
-    month_income += item[KEY_AMOUNT]
+    if same_month(item_date, report):
+        month_income += item[KEY_AMOUNT]
     return total_capital, month_income
 
 
@@ -190,15 +189,18 @@ def final_stats(
     expenses_by_category: dict[str, float] = {}
 
     for item in financial_transactions_storage:
+        if not item:
+            continue
+
         if not date_lower(item[KEY_DATE], report_tuple):
             continue
 
-        if item[KEY_TYPE] == INCOME:
+        if item[KEY_TYPE] == INCOME_COMMAND:
             total_capital, month_income = update_totals_for_income(
                 item, report_tuple, total_capital, month_income,
             )
-        elif item[KEY_TYPE] == COST:
-            total_capital, month_expenses = update_totals_for_cost(
+        elif item[KEY_TYPE] == COST_COMMAND:
+            total_capital, month_expenses, expenses_by_category = update_totals_for_cost(
                 item, report_tuple, total_capital, month_expenses, expenses_by_category,
             )
 
@@ -262,13 +264,9 @@ def command_handler(command: str, parts: list[str]) -> str | None:
     if command == INCOME_COMMAND:
         return handle_income_command(parts)
     is_cost_command = command == COST_COMMAND
-    has_categories_len = len(parts) == CATEGORIES_PARTS
-    is_categories_subcommand = parts[1] == KEY_CATEGORY
-
-    if is_cost_command and has_categories_len and is_categories_subcommand:
-        return cost_categories_handler()
-
-    if command == COST_COMMAND:
+    if is_cost_command and len(parts) >= 2:
+        if len(parts) == STATS_COMMAND_PARTS and parts[1] == KEY_CATEGORY:
+            return cost_categories_handler()
         return handle_cost_add_command(parts)
 
     if command == STATS_COMMAND:
@@ -280,7 +278,7 @@ def work_command(line: str) -> str | None:
     if not line:
         return None
     parts = line.split()
-    result = command_handler(parts[0], parts[1])
+    result = command_handler(parts[0], parts)
     if result is not None:
         return result
     return UNKNOWN_COMMAND_MSG
