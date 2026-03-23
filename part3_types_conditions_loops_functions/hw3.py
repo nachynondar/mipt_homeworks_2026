@@ -181,30 +181,23 @@ def update_totals_for_cost(
     return total_capital, month_expenses, expenses_by_cat
 
 
-def final_stats(
-    report_tuple: DateTuple,
-) -> tuple[float, float, float, dict[str, float]]:
+def final_stats(report_tuple: DateTuple) -> tuple[float, float, float, dict[str, float]]:
     total_capital: float = 0
     month_income: float = 0
     month_expenses: float = 0
     expenses_by_category: dict[str, float] = {}
-
     for item in financial_transactions_storage:
-        if not item:
+        if not item or not date_lower(item[KEY_DATE], report_tuple):
             continue
-
-        if not date_lower(item[KEY_DATE], report_tuple):
-            continue
-
         if item[KEY_TYPE] == INCOME_COMMAND:
             total_capital, month_income = update_totals_for_income(
                 item, report_tuple, total_capital, month_income,
             )
-        elif item[KEY_TYPE] == COST_COMMAND:
+            continue
+        if item[KEY_TYPE] == COST_COMMAND:
             total_capital, month_expenses, expenses_by_category = update_totals_for_cost(
                 item, report_tuple, total_capital, month_expenses, expenses_by_category,
             )
-
     return total_capital, month_income, month_expenses, expenses_by_category
 
 
@@ -251,7 +244,10 @@ def handle_income_command(parts: list[str]) -> str:
 def handle_cost_add_command(parts: list[str]) -> str:
     if len(parts) != COST_COMMAND_PARTS:
         return UNKNOWN_COMMAND_MSG
-    result = cost_handler(parts[1], float(parts[2]), parts[3])
+    category = parts[1]
+    amount = float(parts[2])
+    date_str = parts[3]
+    result = cost_handler(category, amount, date_str)
     if result == NOT_EXISTS_CATEGORY:
         return f"{NOT_EXISTS_CATEGORY}\n{cost_categories_handler()}"
     return result
