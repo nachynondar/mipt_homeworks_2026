@@ -177,11 +177,7 @@ def final_stats(report_tuple: DateTuple) -> tuple[float, float, float, dict[str,
         if not item or not date_lower(item[KEY_DATE], report_tuple):
             continue
         all_transactions(item, report_tuple, state)
-    total: float = state[0]
-    income: float = state[1]
-    expenses: float = state[2]
-    categories: dict[str, float] = state[3]
-    return (total, income, expenses, categories)
+    return (state[0], state[1], state[2], state[3])
 
 
 def profit_loss(month_income: float, month_expenses: float) -> str:
