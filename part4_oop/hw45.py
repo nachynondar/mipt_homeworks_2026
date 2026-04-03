@@ -97,9 +97,7 @@ class LFUPolicy(Policy[K]):
         if len(self._key_counter) <= self.capacity:
             return None
 
-        other_keys = [
-            k for k in self._key_counter if k != self._last_key
-        ]
+        other_keys = [k for k in self._key_counter if k != self._last_key]
         if not other_keys:
             return self._last_key
         return min(other_keys, key=lambda k: self._key_counter[k])
