@@ -26,7 +26,7 @@ class DictStorage(Storage[K, V]):
             del self._data[key]
 
     def clear(self) -> None:
-         self._data.clear()
+        self._data.clear()
 
 
 @dataclass
@@ -76,7 +76,7 @@ class FIFOPolicy(Policy[K]):
 
     def clear(self) -> None:
         self._order.clear()
-        
+
     @property
     def has_keys(self) -> bool:
         return len(self._order) > 0
@@ -86,26 +86,34 @@ class FIFOPolicy(Policy[K]):
 class LFUPolicy(Policy[K]):
     capacity: int = 5
     _key_counter: dict[K, int] = field(default_factory=dict, init=False)
+    _last_key: K | None = field(default=None, init=False)
 
     def register_access(self, key: K) -> None:
-        current_count = self._key_counter(key, 0)
-        self._key_counter = 1 + current_count
+        self._last_key = key  # запомнили ластовый ключ
+        count = 1 + self._key_counter.get(key, 0)
+        if key in self._key_counter:
+            del self._key_counter[key]
+        self._key_counter[key] = count
 
     def get_key_to_evict(self) -> K | None:
-        if len(self._key_counter) > self.capacity:
-            return min(self._key_counter, key = self._key_counter.get)
-        return None
+        if len(self._key_counter) <= self.capacity:
+            return None
+        candidaty = {key: value for key, value in self._key_counter.items() if key != self._last_key}  # мб вылетающие
+
+        if not candidaty:
+            return self._last_key
+        return min(candidaty, key=lambda k: candidaty[k])
 
     def remove_key(self, key: K) -> None:
         if key in self._key_counter:
-            self._key_counter.remove[key]
+            del self._key_counter[key]
 
     def clear(self) -> None:
         self._key_counter.clear()
 
     @property
     def has_keys(self) -> bool:
-        return len(self._key_counter) > 0 
+        return len(self._key_counter) > 0
 
 
 class MIPTCache(Cache[K, V]):
@@ -118,13 +126,13 @@ class MIPTCache(Cache[K, V]):
         self.policy.register_access(key)
         maby_evict_key = self.policy.get_key_to_evict()
         if maby_evict_key is not None:
-            self.policy.remove_key(maby_evict_key)
             self.storage.remove(maby_evict_key)
+            self.policy.remove_key(maby_evict_key)
 
     def get(self, key: K) -> V | None:
         if self.storage.exists(key):
             self.policy.register_access(key)
-            self.storage.get(key)
+            return self.storage.get(key)
         return None
 
     def exists(self, key: K) -> bool:
@@ -140,5 +148,17 @@ class MIPTCache(Cache[K, V]):
 
 
 class CachedProperty[V]:
-    def __init__(self, func: Callable[..., V]) -> None: ...
-    def __get__(self, instance: HasCache[Any, Any] | None, owner: type) -> V: ...  # type: ignore[empty-body]
+    def __init__(self, func: Callable[..., V]) -> None:
+        self.func = func
+        self.attr_name = f"_cached_{func.__name__}"
+
+    def __get__(self, instance: HasCache[Any, Any] | None, owner: type) -> Any:
+        if instance is None:
+            return self
+        cache = instance.cache
+        cached_value: None | V = cache.get(self.attr_name)
+        if cached_value is None:
+            result = self.func(instance)
+            cache.set(self.attr_name, result)
+            return result
+        return cached_value
