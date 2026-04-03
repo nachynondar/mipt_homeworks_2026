@@ -89,31 +89,33 @@ class LFUPolicy(Policy[K]):
     _last_key: K | None = field(default=None, init=False)
 
     def register_access(self, key: K) -> None:
-        self._last_key = key  # запомнили ластовый ключ
-        count = 1 + self._key_counter.get(key, 0)
-        if key in self._key_counter:
-            del self._key_counter[key]
+        self._last_key = key
+        count = self._key_counter.pop(key, 0) + 1
         self._key_counter[key] = count
 
     def get_key_to_evict(self) -> K | None:
         if len(self._key_counter) <= self.capacity:
             return None
-        candidaty = {key: value for key, value in self._key_counter.items() if key != self._last_key}  # мб вылетающие
 
-        if not candidaty:
+        other_keys = [
+            k for k in self._key_counter if k != self._last_key
+        ]
+        if not other_keys:
             return self._last_key
-        return min(candidaty, key=lambda k: candidaty[k])
+        return min(other_keys, key=lambda k: self._key_counter[k])
 
     def remove_key(self, key: K) -> None:
-        if key in self._key_counter:
-            del self._key_counter[key]
+        self._key_counter.pop(key, None)
+        if self._last_key == key:
+            self._last_key = None
 
     def clear(self) -> None:
         self._key_counter.clear()
+        self._last_key = None
 
     @property
     def has_keys(self) -> bool:
-        return len(self._key_counter) > 0
+        return bool(self._key_counter)
 
 
 class MIPTCache(Cache[K, V]):
