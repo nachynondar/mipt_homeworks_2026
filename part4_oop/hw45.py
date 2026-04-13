@@ -89,12 +89,15 @@ class LFUPolicy(Policy[K]):
 
     def register_access(self, key: K) -> None:
         self._last_key = key
-        count = self._key_counter.pop(key, 0) + 1
-        self._key_counter[key] = count
+        if key in self._key_counter:
+            self._key_counter[key] += 1
+        else:
+            self._key_counter[key] = 1
 
     def get_key_to_evict(self) -> K | None:
         if len(self._key_counter) <= self.capacity:
             return None
+
         other_keys = [k for k in self._key_counter if k != self._last_key]
         return min(other_keys, key=lambda k: self._key_counter[k])
 
