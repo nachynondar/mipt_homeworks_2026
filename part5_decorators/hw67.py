@@ -20,7 +20,10 @@ class CallableWithMeta(Protocol[P, R_co]):
 
 
 class BreakerError(Exception):
-    pass
+    def __init__(self, message: str, func_name: str, block_time: datetime.datetime):
+        super().__init__(message)
+        self.func_name = func_name
+        self.block_time = block_time
 
 
 class CircuitBreaker:
