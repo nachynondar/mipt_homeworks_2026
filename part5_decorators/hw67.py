@@ -32,7 +32,6 @@ class BreakerError(Exception):
 
 
 def _is_positive_integer(var: Any) -> bool:
-    """Вспомогательная функция для валидации аргументов."""
     return isinstance(var, int) and var > 0
 
 
